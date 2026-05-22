@@ -1,6 +1,6 @@
 name: Make BOATRACE forecast files
 
-on:
+"on":
   workflow_dispatch:
     inputs:
       jcd:
