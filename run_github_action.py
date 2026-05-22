@@ -113,7 +113,13 @@ def main() -> None:
     # 3. 選手別・コース別集計
     # =====================================================
     print("[3/4] build racer course style summary...")
-    summary_df = build_racer_course_style_summary(results_raw_df)
+
+    # pandas merge時に DataFrame.attrs 内の DataFrame 同士を比較して落ちることがある。
+    # 集計処理に attrs は不要なので、attrs を消したコピーを渡す。
+    summary_input_df = results_raw_df.copy()
+    summary_input_df.attrs.clear()
+
+    summary_df = build_racer_course_style_summary(summary_input_df)
     summary_df = add_reliability_flags(summary_df)
 
     summary_path = out_dir / f"racer_course_style_summary_jcd{jcd}_{start_hd}_{prev_hd}.csv"
@@ -142,7 +148,9 @@ def main() -> None:
             break
 
     if tenkai_src is None:
-        raise FileNotFoundError("fixed_files/展開.txt または fixed_files/tenkai.txt が見つかりません。")
+        raise FileNotFoundError(
+            "fixed_files/展開.txt または fixed_files/tenkai.txt が見つかりません。"
+        )
 
     readme_path = out_dir / "README.md"
     tenkai_path = out_dir / "展開.txt"
@@ -153,38 +161,40 @@ def main() -> None:
     # =====================================================
     # 5. サマリ
     # =====================================================
-    fetch_summary_df = pd.DataFrame([
-        {
-            "target": "racelist_final",
-            "jcd": jcd,
-            "start_hd": "",
-            "prev_hd": "",
-            "final_hd": final_hd,
-            "rows": len(racelist_df),
-            "error_rows": len(racelist_errors_df),
-            "is_empty": racelist_df.empty,
-        },
-        {
-            "target": "results_raw",
-            "jcd": jcd,
-            "start_hd": start_hd,
-            "prev_hd": prev_hd,
-            "final_hd": "",
-            "rows": len(results_raw_df),
-            "error_rows": len(results_errors_df),
-            "is_empty": results_raw_df.empty,
-        },
-        {
-            "target": "summary",
-            "jcd": jcd,
-            "start_hd": start_hd,
-            "prev_hd": prev_hd,
-            "final_hd": "",
-            "rows": len(summary_df),
-            "error_rows": 0,
-            "is_empty": summary_df.empty,
-        },
-    ])
+    fetch_summary_df = pd.DataFrame(
+        [
+            {
+                "target": "racelist_final",
+                "jcd": jcd,
+                "start_hd": "",
+                "prev_hd": "",
+                "final_hd": final_hd,
+                "rows": len(racelist_df),
+                "error_rows": len(racelist_errors_df),
+                "is_empty": racelist_df.empty,
+            },
+            {
+                "target": "results_raw",
+                "jcd": jcd,
+                "start_hd": start_hd,
+                "prev_hd": prev_hd,
+                "final_hd": "",
+                "rows": len(results_raw_df),
+                "error_rows": len(results_errors_df),
+                "is_empty": results_raw_df.empty,
+            },
+            {
+                "target": "summary",
+                "jcd": jcd,
+                "start_hd": start_hd,
+                "prev_hd": prev_hd,
+                "final_hd": "",
+                "rows": len(summary_df),
+                "error_rows": 0,
+                "is_empty": summary_df.empty,
+            },
+        ]
+    )
 
     fetch_summary_path = out_dir / f"debug_fetch_summary_jcd{jcd}_{final_hd}.csv"
     save_csv(fetch_summary_df, fetch_summary_path)
