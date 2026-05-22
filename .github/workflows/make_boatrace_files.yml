@@ -1,0 +1,62 @@
+name: Make BOATRACE forecast files
+
+on:
+  workflow_dispatch:
+    inputs:
+      jcd:
+        description: "場コード 例: 09, 14"
+        required: true
+        default: "09"
+      start_date:
+        description: "初日 YYYYMMDD 例: 20260415"
+        required: true
+        default: "20260415"
+      prev_date:
+        description: "前日 YYYYMMDD 例: 20260419"
+        required: true
+        default: "20260419"
+      final_date:
+        description: "最終日 YYYYMMDD 例: 20260420"
+        required: true
+        default: "20260420"
+
+jobs:
+  make-files:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy requests beautifulsoup4 lxml python-dateutil
+
+      - name: Run BOATRACE file maker
+        run: |
+          python run_github_action.py \
+            --jcd "${{ github.event.inputs.jcd }}" \
+            --start-date "${{ github.event.inputs.start_date }}" \
+            --prev-date "${{ github.event.inputs.prev_date }}" \
+            --final-date "${{ github.event.inputs.final_date }}"
+
+      - name: Upload output artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: boatrace_forecast_files_jcd${{ github.event.inputs.jcd }}_${{ github.event.inputs.final_date }}
+          path: outputs/github_action/**/*.zip
+          if-no-files-found: error
+
+      - name: Upload debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boatrace_debug_jcd${{ github.event.inputs.jcd }}_${{ github.event.inputs.final_date }}
+          path: outputs/github_action/**/*
+          if-no-files-found: warn
