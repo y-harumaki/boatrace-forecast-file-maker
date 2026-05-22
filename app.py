@@ -1,17 +1,34 @@
 from __future__ import annotations
 
 import shutil
+import traceback
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
-from src.builders import (
-    build_racelist_detail,
-    build_results_raw,
-    build_racer_course_style_summary,
-    add_reliability_flags,
-)
+# =========================================================
+# 安全import
+# =========================================================
+
+IMPORT_ERROR_TEXT = None
+
+try:
+    from src.builders import (
+        build_racelist_detail,
+        build_results_raw,
+        build_racer_course_style_summary,
+    )
+
+    try:
+        from src.builders import add_reliability_flags
+    except Exception:
+        def add_reliability_flags(summary: pd.DataFrame) -> pd.DataFrame:
+            return summary if summary is not None else pd.DataFrame()
+
+except Exception:
+    IMPORT_ERROR_TEXT = traceback.format_exc()
+
 from src.validators import (
     validate_racelist_detail,
     validate_results_raw,
@@ -26,6 +43,11 @@ st.set_page_config(
 )
 
 st.title("BOATRACE 最終日予想ファイル作成ツール")
+
+if IMPORT_ERROR_TEXT is not None:
+    st.error("src.builders の読み込みに失敗しています。")
+    st.code(IMPORT_ERROR_TEXT)
+    st.stop()
 
 st.write(
     "場コードと期間を入力すると、ChatGPTに添付する4ファイルを作成します。"
@@ -68,21 +90,36 @@ if run:
     output_dir = Path("outputs") / f"jcd{jcd}_{final_hd}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    st.info("最終日の出走表を取得しています...")
-    racelist_df = build_racelist_detail(jcd, final_hd)
+    try:
+        st.info("最終日の出走表を取得しています...")
+        racelist_df = build_racelist_detail(jcd, final_hd)
+    except Exception:
+        st.error("出走表取得でエラーが発生しました。")
+        st.code(traceback.format_exc())
+        st.stop()
 
     racelist_path = output_dir / f"racelist_detail_jcd{jcd}_{final_hd}.csv"
     racelist_df.to_csv(racelist_path, index=False, encoding="utf-8-sig")
 
-    st.info("初日〜前日の結果を取得しています...")
-    results_raw_df = build_results_raw(jcd, start_hd, prev_hd)
+    try:
+        st.info("初日〜前日の結果を取得しています...")
+        results_raw_df = build_results_raw(jcd, start_hd, prev_hd)
+    except Exception:
+        st.error("結果取得でエラーが発生しました。")
+        st.code(traceback.format_exc())
+        st.stop()
 
     raw_path = output_dir / f"race_results_raw_jcd{jcd}_{start_hd}_{prev_hd}.csv"
     results_raw_df.to_csv(raw_path, index=False, encoding="utf-8-sig")
 
-    st.info("選手別・コース別傾向を集計しています...")
-    summary_df = build_racer_course_style_summary(results_raw_df)
-    summary_df = add_reliability_flags(summary_df)
+    try:
+        st.info("選手別・コース別傾向を集計しています...")
+        summary_df = build_racer_course_style_summary(results_raw_df)
+        summary_df = add_reliability_flags(summary_df)
+    except Exception:
+        st.error("選手別・コース別傾向の集計でエラーが発生しました。")
+        st.code(traceback.format_exc())
+        st.stop()
 
     summary_path = output_dir / f"racer_course_style_summary_jcd{jcd}_{start_hd}_{prev_hd}.csv"
     summary_df.to_csv(summary_path, index=False, encoding="utf-8-sig")
@@ -99,6 +136,10 @@ if run:
         if p.exists():
             tenkai_src = p
             break
+
+    if not readme_src.exists():
+        st.error("fixed_files/README.md が見つかりません。")
+        st.stop()
 
     if tenkai_src is None:
         st.error("fixed_files/展開.txt または fixed_files/tenkai.txt が見つかりません。")
