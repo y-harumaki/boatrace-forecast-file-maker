@@ -100,11 +100,16 @@ def parse_racelist(html: str, race_date: str, jcd: str, rno: int, url: str) -> p
     # 枠番ブロックを検出
     frame_positions = []
     for i, line in enumerate(body):
-        if line in FW_TO_INT:
-            # 直後に「登録番号 / 級別」があるものだけを採用
-            nxt = " ".join(body[i + 1 : i + 8])
+        # web抽出やBS4のget_textでは「１」単独ではなく「１ Image」のように
+        # 画像alt等が混ざる場合があるため、行頭の全角艇番だけを見る。
+        m_frame = re.match(r"^([１２３４５６])(?:\s|$)", line)
+        if m_frame:
+            frame = FW_TO_INT[m_frame.group(1)]
+            # 直後に「登録番号 / 級別」があるものだけを採用。
+            # レース選択ナビ等に出る艇番リンクの誤検出を避ける。
+            nxt = " ".join(body[i + 1 : i + 10])
             if re.search(r"\d{4}\s*/\s*[AB]\d", nxt):
-                frame_positions.append((i, FW_TO_INT[line]))
+                frame_positions.append((i, frame))
 
     rows: list[dict[str, Any]] = []
     for pos_idx, (pos, frame) in enumerate(frame_positions):
@@ -280,7 +285,7 @@ def parse_raceresult(html: str, race_date: str, jcd: str, rno: int, url: str) ->
             break
         if not in_result:
             continue
-        m = re.match(r"^([１２３４５６])\s+([1-6])\s+(\d{4})\s+(.+?)(?:\s+\d+'\d+\"\d)?$", line)
+        m = re.match(r"^([１２３４５６])\s+([1-6])\s+(\d{4})\s+(.+?)(?:\s+[0-9]'[0-9]{2}\"[0-9])?$", line)
         if m:
             result_rows.append(
                 {
@@ -303,7 +308,9 @@ def parse_raceresult(html: str, race_date: str, jcd: str, rno: int, url: str) ->
             break
         if not in_start:
             continue
-        m = re.match(r"^([1-6])\s+\.?([0-9]{2})\b\s*(逃げ|差し|まくり差し|まくり|抜き|恵まれ)?", line)
+        # 例: "1 Image .08" / "4 Image .08 まくり" のように
+        # 艇番とSTの間に画像altや空白が入るため、艇番の後ろを緩く読む。
+        m = re.match(r"^([1-6])\b.*?\.?([0-9]{2})\b\s*(逃げ|差し|まくり差し|まくり|抜き|恵まれ)?", line)
         if m:
             course_no += 1
             start_rows.append(
